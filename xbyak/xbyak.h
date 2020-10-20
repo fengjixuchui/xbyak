@@ -135,7 +135,7 @@ namespace Xbyak {
 
 enum {
 	DEFAULT_MAX_CODE_SIZE = 4096,
-	VERSION = 0x5970 /* 0xABCD = A.BC(D) */
+	VERSION = 0x5990 /* 0xABCD = A.BC(D) */
 };
 
 #ifndef MIE_INTEGER_TYPE_DEFINED
@@ -924,6 +924,10 @@ inline RegExp operator*(const Reg& r, int scale)
 {
 	return RegExp(r, scale);
 }
+inline RegExp operator*(int scale, const Reg& r)
+{
+	return r * scale;
+}
 inline RegExp operator-(const RegExp& e, size_t disp)
 {
 	RegExp ret = e;
@@ -1538,6 +1542,12 @@ inline const uint8_t* Label::getAddress() const
 	if (!mgr->getOffset(&offset, *this)) return 0;
 	return mgr->getCode() + offset;
 }
+
+typedef enum {
+	DefaultEncoding,
+	VexEncoding,
+	EvexEncoding
+} PreferredEncoding;
 
 class CodeGenerator : public CodeArray {
 public:
@@ -2292,6 +2302,19 @@ private:
 		if (addr.hasZero()) XBYAK_THROW(ERR_INVALID_ZERO)
 		if (addr.getRegExp().getIndex().getKind() != kind) XBYAK_THROW(ERR_BAD_VSIB_ADDRESSING)
 		opVex(x, 0, addr, type, code);
+	}
+	void opVnni(const Xmm& x1, const Xmm& x2, const Operand& op, int type, int code0, PreferredEncoding encoding)
+	{
+		if (encoding == DefaultEncoding) {
+			encoding = EvexEncoding;
+		}
+		if (encoding == EvexEncoding) {
+#ifdef XBYAK_DISABLE_AVX512
+			XBYAK_THROW(ERR_EVEX_IS_INVALID)
+#endif
+			type |= T_MUST_EVEX;
+		}
+		opAVX_X_X_XM(x1, x2, op, type, code0);
 	}
 	void opInOut(const Reg& a, const Reg& d, uint8_t code)
 	{
